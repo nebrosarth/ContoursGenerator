@@ -2,6 +2,7 @@
 
 #include <QtWidgets/QMainWindow>
 #include "ui_ContoursGenerator.h"
+#include "opencv.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class ContoursGeneratorClass; };
@@ -11,6 +12,11 @@ struct GenerationParams
 {
     int width, height;
 };
+
+namespace utils
+{
+    QPixmap cvMat2Pixmap(const cv::Mat& input);
+}
 
 class ContoursGenerator : public QMainWindow
 {

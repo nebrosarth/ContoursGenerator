@@ -54,19 +54,26 @@
            <enum>QFrame::Raised</enum>
           </property>
           <layout class="QGridLayout" name="gridLayout_2">
-           <item row="1" column="1">
-            <widget class="QSpinBox" name="spinBox_Height">
-             <property name="minimum">
-              <number>1</number>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_2">
+             <property name="text">
+              <string>height</string>
              </property>
-             <property name="maximum">
-              <number>10000</number>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
              </property>
-             <property name="stepType">
-              <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+            </widget>
+           </item>
+           <item row="2" column="0" colspan="2">
+            <widget class="QPushButton" name="pushButton_Generate">
+             <property name="text">
+              <string>Generate</string>
              </property>
-             <property name="value">
-              <number>256</number>
+             <property name="autoDefault">
+              <bool>false</bool>
+             </property>
+             <property name="default">
+              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -96,20 +103,33 @@
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="label_2">
-             <property name="text">
-              <string>height</string>
+           <item row="1" column="1">
+            <widget class="QSpinBox" name="spinBox_Height">
+             <property name="minimum">
+              <number>1</number>
              </property>
-             <property name="alignment">
-              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             <property name="maximum">
+              <number>10000</number>
+             </property>
+             <property name="stepType">
+              <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
+             </property>
+             <property name="value">
+              <number>256</number>
              </property>
             </widget>
            </item>
-           <item row="2" column="0" colspan="2">
-            <widget class="QPushButton" name="pushButton_Generate">
+           <item row="3" column="0">
+            <widget class="QLabel" name="label_3">
              <property name="text">
-              <string>Generate</string>
+              <string>Seed:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QLabel" name="label_Seed">
+             <property name="text">
+              <string>0</string>
              </property>
             </widget>
            </item>
