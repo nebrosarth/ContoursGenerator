@@ -40,12 +40,16 @@ void ContoursGenerator::generateImage()
 	cv::Mat grad;
 	cv::Mat n(params.width, params.height, CV_64FC1);
 
+	double xMul = params.Xmul; // default: 0.005
+	double yMul = params.Ymul; // default: 0.005
+	int mul = params.mul; // default: 20
+
 #pragma omp parallel for
 	for (int j = 0; j < n.rows; ++j)
 	{
 		for (int i = 0; i < n.cols; ++i)
 		{
-			double noise = perlin.noise2D_01(i * 0.005, j * 0.005) * 20;
+			double noise = perlin.noise2D_01(i * xMul, j * yMul) * mul;
 			int nnn = (int)ceil(noise);
 			noise = noise - floor(noise);
 			n.at<double>(j, i) = noise;
@@ -84,6 +88,9 @@ GenerationParams ContoursGenerator::getUIParams()
 	{
 		params.height = ui->spinBox_Width->value();
 		params.width = ui->spinBox_Height->value();
+		params.Xmul = ui->doubleSpinBox_Xmul->value();
+		params.Ymul = ui->doubleSpinBox_Ymul->value();
+		params.mul = ui->spinBox_mul->value();
 	}
 	return params;
 }

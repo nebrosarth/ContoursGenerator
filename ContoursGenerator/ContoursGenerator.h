@@ -11,6 +11,8 @@ QT_END_NAMESPACE
 struct GenerationParams
 {
     int width, height;
+    double Xmul, Ymul;
+    int mul;
 };
 
 namespace utils
