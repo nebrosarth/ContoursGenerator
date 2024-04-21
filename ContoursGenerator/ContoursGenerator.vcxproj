@@ -99,14 +99,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="RandomGenerator.cpp" />
     <QtRcc Include="ContoursGenerator.qrc" />
     <QtUic Include="ContoursGenerator.ui" />
     <QtMoc Include="ContoursGenerator.h" />
     <ClCompile Include="ContoursGenerator.cpp" />
+    <ClCompile Include="DrawOperations.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DrawOperations.h" />
     <ClInclude Include="PerlinNoise.hpp" />
+    <ClInclude Include="RandomGenerator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

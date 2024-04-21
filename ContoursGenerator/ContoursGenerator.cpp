@@ -1,6 +1,7 @@
 #include "ContoursGenerator.h"
 #include "PerlinNoise.hpp"
 #include <omp.h>
+#include "DrawOperations.h"
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -77,6 +78,16 @@ void ContoursGenerator::generateImage()
 	grad = cv::Scalar(255) - grad;
 
 	QPixmap pixmap = utils::cvMat2Pixmap(grad);
+
+	if (params.generateWells)
+	{
+		WellParams wellParams = getUIWellParams();
+		for (int i = 0; i < params.numOfWells; ++i)
+		{
+			DrawOperations::drawRandomWell(pixmap, wellParams);
+		}
+	}
+
 	ui->label_Image->setPixmap(pixmap);
 }
 
@@ -90,6 +101,22 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.Xmul = ui->doubleSpinBox_Xmul->value();
 		params.Ymul = ui->doubleSpinBox_Ymul->value();
 		params.mul = ui->spinBox_mul->value();
+		params.generateWells = ui->groupBox_Wells->isChecked();
+		params.numOfWells = ui->spinBox_Wells->value();
+	}
+	return params;
+}
+
+WellParams ContoursGenerator::getUIWellParams()
+{
+	WellParams params{};
+	if (ui)
+	{
+		params.drawText = ui->groupBox_Wellname->isChecked();
+		params.fontSize = ui->spinBox_wellFontSize->value();
+		params.radius = ui->spinBox_WellRadius->value();
+		params.offset = ui->spinBox_WellnameOffset->value();
+		params.outline = ui->spinBox_WellOutline->value();
 	}
 	return params;
 }
