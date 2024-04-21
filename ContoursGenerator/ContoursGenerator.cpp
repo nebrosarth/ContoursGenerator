@@ -18,6 +18,10 @@ ContoursGenerator::~ContoursGenerator()
 void ContoursGenerator::initConnections()
 {
 	connect(ui->pushButton_Generate, &QPushButton::pressed, this, &ContoursGenerator::generateImage);
+	connect(ui->pushButton_256, &QPushButton::pressed, this, &ContoursGenerator::setSize<256>);
+	connect(ui->pushButton_512, &QPushButton::pressed, this, &ContoursGenerator::setSize<512>);
+	connect(ui->pushButton_1024, &QPushButton::pressed, this, &ContoursGenerator::setSize<1024>);
+	connect(ui->pushButton_2048, &QPushButton::pressed, this, &ContoursGenerator::setSize<2048>);
 }
 
 void ContoursGenerator::generateImage()
@@ -103,4 +107,11 @@ QPixmap utils::cvMat2Pixmap(const cv::Mat& input)
 	}
 	QPixmap cpy = QPixmap::fromImage(image);
 	return cpy;
+}
+
+template<int size>
+inline void ContoursGenerator::setSize()
+{
+	ui->spinBox_Height->setValue(size);
+	ui->spinBox_Width->setValue(size);
 }

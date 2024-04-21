@@ -33,6 +33,9 @@ protected:
     void generateImage();
     GenerationParams getUIParams();
 
+    template<int size> 
+    void setSize(); // set image size
+
 private:
     std::unique_ptr<Ui::ContoursGeneratorClass> ui;
 };
