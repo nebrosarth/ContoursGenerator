@@ -26,14 +26,9 @@ void ContoursGenerator::generateImage()
 
 	static std::random_device dev;
 	static std::mt19937 rng(dev());
-	static std::uniform_int_distribution<std::mt19937::result_type> dist_int(1, 100);
+	static std::uniform_int_distribution<std::mt19937::result_type> dist_uint(0, UINT_MAX);
 
-	auto now = std::chrono::system_clock::now();
-	auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-	auto value = now_ms.time_since_epoch();
-	long long time = value.count();
-
-	const siv::PerlinNoise::seed_type seed = time;
+	const siv::PerlinNoise::seed_type seed = dist_uint(rng);
 	const siv::PerlinNoise perlin{ seed };
 	ui->label_Seed->setText(QString::number(seed));
 
