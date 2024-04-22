@@ -17,6 +17,6 @@ private:
 
 	std::random_device dev;
 	std::mt19937 rng;
-	std::map<int, std::uniform_int_distribution<std::mt19937::result_type>> distributions;
+	std::uniform_real_distribution<> distribution;
 };
 

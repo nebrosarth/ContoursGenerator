@@ -13,12 +13,11 @@ QPoint RandomGenerator::getRandomPoint(int maxWidth, int maxHeight)
 
 int RandomGenerator::getRandomInt(int max)
 {
-	auto iter = distributions.try_emplace(max, std::uniform_int_distribution<std::mt19937::result_type>(0, max));
-	return iter.first->second(rng);
+	return distribution(rng) * max;
 }
 
 
 RandomGenerator::RandomGenerator() :
-	rng(dev())
+	rng(dev()), distribution(0.0, 1.0)
 {
 }
