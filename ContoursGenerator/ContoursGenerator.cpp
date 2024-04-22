@@ -2,6 +2,7 @@
 #include "PerlinNoise.hpp"
 #include <omp.h>
 #include "DrawOperations.h"
+#include "RandomGenerator.h"
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -29,11 +30,7 @@ void ContoursGenerator::generateImage()
 {
 	GenerationParams params = getUIParams();
 
-	static std::random_device dev;
-	static std::mt19937 rng(dev());
-	static std::uniform_int_distribution<std::mt19937::result_type> dist_uint(0, UINT_MAX);
-
-	const siv::PerlinNoise::seed_type seed = dist_uint(rng);
+	const siv::PerlinNoise::seed_type seed = RandomGenerator::instance().getRandomInt(INT_MAX);
 	const siv::PerlinNoise perlin{ seed };
 	ui->label_Seed->setText(QString::number(seed));
 
