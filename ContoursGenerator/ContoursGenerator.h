@@ -41,6 +41,7 @@ public:
 protected slots:
     void OnGenerateImage();
     void OnUpdateImage();
+    void OnSaveImage();
 
 protected:
     void initConnections();

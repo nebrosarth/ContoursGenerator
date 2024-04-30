@@ -3,6 +3,10 @@
 #include <omp.h>
 #include "DrawOperations.h"
 #include "RandomGenerator.h"
+#include <qfile.h>
+#include <qfiledialog.h>
+#include <qtemporaryfile.h>
+#include <quuid.h>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -38,6 +42,34 @@ void ContoursGenerator::OnUpdateImage()
 	}
 }
 
+void ContoursGenerator::OnSaveImage()
+{
+	if (m_generatedImage.isNull() || m_generatedMask.isNull())
+	{
+		return;
+	}
+
+	QString folderName = QFileDialog::getExistingDirectory(this);
+	if (folderName.isEmpty())
+	{
+		return;
+	}
+
+	QString baseName = QUuid::createUuid().toString().mid(1, 8);
+	QString imageFileName = folderName + "/" + baseName + "_image.png";
+	QString maskFileName = folderName + "/" + baseName + "_mask.png";
+
+	if (!m_generatedImage.save(imageFileName, "PNG"))
+	{
+		return;
+	}
+	if (!m_generatedMask.save(maskFileName, "PNG"))
+	{
+		QFile::remove(imageFileName);
+		return;
+	}
+}
+
 void ContoursGenerator::initConnections()
 {
 	connect(ui->pushButton_Generate, &QPushButton::pressed, this, &ContoursGenerator::OnGenerateImage);
@@ -46,6 +78,7 @@ void ContoursGenerator::initConnections()
 	connect(ui->pushButton_1024, &QPushButton::pressed, this, &ContoursGenerator::setSize<1024>);
 	connect(ui->pushButton_2048, &QPushButton::pressed, this, &ContoursGenerator::setSize<2048>);
 	connect(ui->checkBox_ShowMask, &QCheckBox::stateChanged, this, &ContoursGenerator::OnUpdateImage);
+	connect(ui->pushButton_Save, &QPushButton::pressed, this, &ContoursGenerator::OnSaveImage);
 }
 
 GenImg ContoursGenerator::generateImage()
