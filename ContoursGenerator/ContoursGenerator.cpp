@@ -55,18 +55,22 @@ void ContoursGenerator::OnSaveImage()
 		return;
 	}
 
-	QString baseName = QUuid::createUuid().toString().mid(1, 8);
-	QString imageFileName = folderName + "/" + baseName + "_image.png";
-	QString maskFileName = folderName + "/" + baseName + "_mask.png";
+	saveImage(folderName, m_generatedImage, m_generatedMask);
+}
 
-	if (!m_generatedImage.save(imageFileName, "PNG"))
+void ContoursGenerator::OnSaveBatch()
+{
+	QString folderName = QFileDialog::getExistingDirectory(this);
+	if (folderName.isEmpty())
 	{
 		return;
 	}
-	if (!m_generatedMask.save(maskFileName, "PNG"))
+
+	int batchSize = ui->spinBox_BatchSize->value();
+	for (int i = 0; i < batchSize; ++i)
 	{
-		QFile::remove(imageFileName);
-		return;
+		GenImg generation = generateImage();
+		saveImage(folderName, generation.image, generation.mask);
 	}
 }
 
@@ -79,6 +83,7 @@ void ContoursGenerator::initConnections()
 	connect(ui->pushButton_2048, &QPushButton::pressed, this, &ContoursGenerator::setSize<2048>);
 	connect(ui->checkBox_ShowMask, &QCheckBox::stateChanged, this, &ContoursGenerator::OnUpdateImage);
 	connect(ui->pushButton_Save, &QPushButton::pressed, this, &ContoursGenerator::OnSaveImage);
+	connect(ui->pushButton_GenerateBatch, &QPushButton::pressed, this, &ContoursGenerator::OnSaveBatch);
 }
 
 GenImg ContoursGenerator::generateImage()
@@ -145,6 +150,26 @@ GenImg ContoursGenerator::generateImage()
 	GenImg result{ pixmap, mask };
 	return result;
 
+}
+
+void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask)
+{
+	QDir().mkpath(folderPath + "/images");
+	QDir().mkpath(folderPath + "/masks");
+
+	QString baseName = QUuid::createUuid().toString().mid(1, 8);
+	QString imageFileName = folderPath + "/images/" + baseName + "_image.png";
+	QString maskFileName = folderPath + "/masks/" + baseName + "_mask.png";
+
+	if (!img.save(imageFileName, "PNG"))
+	{
+		return;
+	}
+	if (!mask.save(maskFileName, "PNG"))
+	{
+		QFile::remove(imageFileName);
+		return;
+	}
 }
 
 GenerationParams ContoursGenerator::getUIParams()

@@ -42,10 +42,12 @@ protected slots:
     void OnGenerateImage();
     void OnUpdateImage();
     void OnSaveImage();
+    void OnSaveBatch();
 
 protected:
     void initConnections();
     GenImg generateImage();
+    void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
     GenerationParams getUIParams();
     WellParams getUIWellParams();
 
