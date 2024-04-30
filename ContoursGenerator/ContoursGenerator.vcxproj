@@ -61,13 +61,13 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
-    <IncludePath>C:\opencv5\sources\include\opencv2;$(IncludePath)</IncludePath>
+    <IncludePath>$(OPENCV_IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world500d.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world490d.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OPENCV_DIR)\lib</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
