@@ -17,16 +17,38 @@ ContoursGenerator::~ContoursGenerator()
 {
 }
 
+void ContoursGenerator::OnGenerateImage()
+{
+	GenImg genImg = generateImage();
+	m_generatedImage = genImg.image;
+	m_generatedMask = genImg.mask;
+
+	OnUpdateImage();
+}
+
+void ContoursGenerator::OnUpdateImage()
+{
+	if (ui->checkBox_ShowMask->isChecked())
+	{
+		ui->label_Image->setPixmap(m_generatedMask);
+	}
+	else
+	{
+		ui->label_Image->setPixmap(m_generatedImage);
+	}
+}
+
 void ContoursGenerator::initConnections()
 {
-	connect(ui->pushButton_Generate, &QPushButton::pressed, this, &ContoursGenerator::generateImage);
+	connect(ui->pushButton_Generate, &QPushButton::pressed, this, &ContoursGenerator::OnGenerateImage);
 	connect(ui->pushButton_256, &QPushButton::pressed, this, &ContoursGenerator::setSize<256>);
 	connect(ui->pushButton_512, &QPushButton::pressed, this, &ContoursGenerator::setSize<512>);
 	connect(ui->pushButton_1024, &QPushButton::pressed, this, &ContoursGenerator::setSize<1024>);
 	connect(ui->pushButton_2048, &QPushButton::pressed, this, &ContoursGenerator::setSize<2048>);
+	connect(ui->checkBox_ShowMask, &QCheckBox::stateChanged, this, &ContoursGenerator::OnUpdateImage);
 }
 
-void ContoursGenerator::generateImage()
+GenImg ContoursGenerator::generateImage()
 {
 	GenerationParams params = getUIParams();
 
@@ -72,9 +94,9 @@ void ContoursGenerator::generateImage()
 				u = 255;
 			}
 		});
-	grad = cv::Scalar(255) - grad;
+	cv::Mat gradInv = cv::Scalar(255) - grad;
 
-	QPixmap pixmap = utils::cvMat2Pixmap(grad);
+	QPixmap pixmap = utils::cvMat2Pixmap(gradInv);
 
 	if (params.generateWells)
 	{
@@ -85,7 +107,11 @@ void ContoursGenerator::generateImage()
 		}
 	}
 
-	ui->label_Image->setPixmap(pixmap);
+	QPixmap mask = utils::cvMat2Pixmap(grad);
+
+	GenImg result{ pixmap, mask };
+	return result;
+
 }
 
 GenerationParams ContoursGenerator::getUIParams()

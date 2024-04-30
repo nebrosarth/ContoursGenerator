@@ -2,7 +2,7 @@
 
 #include <QtWidgets/QMainWindow>
 #include "ui_ContoursGenerator.h"
-#include "opencv.hpp"
+#include "opencv2/opencv.hpp"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class ContoursGeneratorClass; };
@@ -19,6 +19,12 @@ struct GenerationParams
     int numOfWells;
 };
 
+struct GenImg
+{
+    QPixmap image;
+    QPixmap mask;
+};
+
 namespace utils
 {
     QPixmap cvMat2Pixmap(const cv::Mat& input);
@@ -32,9 +38,13 @@ public:
     ContoursGenerator(QWidget *parent = nullptr);
     ~ContoursGenerator();
 
+protected slots:
+    void OnGenerateImage();
+    void OnUpdateImage();
+
 protected:
     void initConnections();
-    void generateImage();
+    GenImg generateImage();
     GenerationParams getUIParams();
     WellParams getUIWellParams();
 
@@ -43,4 +53,6 @@ protected:
 
 private:
     std::unique_ptr<Ui::ContoursGeneratorClass> ui;
+    QPixmap m_generatedImage;
+    QPixmap m_generatedMask;
 };
