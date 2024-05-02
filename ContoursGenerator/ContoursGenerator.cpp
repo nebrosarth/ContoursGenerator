@@ -157,9 +157,15 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 	QDir().mkpath(folderPath + "/images");
 	QDir().mkpath(folderPath + "/masks");
 
-	QString baseName = QUuid::createUuid().toString().mid(1, 8);
-	QString imageFileName = folderPath + "/images/" + baseName + "_image.png";
-	QString maskFileName = folderPath + "/masks/" + baseName + "_mask.png";
+	QString baseName;
+	int index = 0;
+	QString imageFileName, maskFileName;
+	do {
+		baseName = QString::number(index);
+		imageFileName = folderPath + "/images/" + baseName + ".png";
+		maskFileName = folderPath + "/masks/" + baseName + ".png";
+		index++;
+	} while (QFile::exists(imageFileName) || QFile::exists(maskFileName));
 
 	if (!img.save(imageFileName, "PNG"))
 	{
