@@ -46,6 +46,7 @@ protected slots:
 
 protected:
     void initConnections();
+    cv::Mat generateIsolines(const GenerationParams& params);
     GenImg generateImage();
     void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
     GenerationParams getUIParams();

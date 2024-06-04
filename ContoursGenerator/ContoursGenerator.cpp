@@ -86,10 +86,8 @@ void ContoursGenerator::initConnections()
 	connect(ui->pushButton_GenerateBatch, &QPushButton::pressed, this, &ContoursGenerator::OnSaveBatch);
 }
 
-GenImg ContoursGenerator::generateImage()
+cv::Mat ContoursGenerator::generateIsolines(const GenerationParams& params)
 {
-	GenerationParams params = getUIParams();
-
 	const siv::PerlinNoise::seed_type seed = RandomGenerator::instance().getRandomInt(INT_MAX);
 	const siv::PerlinNoise perlin{ seed };
 	ui->label_Seed->setText(QString::number(seed));
@@ -134,20 +132,31 @@ GenImg ContoursGenerator::generateImage()
 		});
 	cv::Mat gradInv = cv::Scalar(255) - grad;
 
-	QPixmap pixmap = utils::cvMat2Pixmap(gradInv);
+	return gradInv;
+}
+
+GenImg ContoursGenerator::generateImage()
+{
+	GenerationParams params = getUIParams();
+
+	cv::Mat isolines = generateIsolines(params);
+
+	cv::Mat mask = cv::Scalar(255) - isolines;
+
+	QPixmap pixIso = utils::cvMat2Pixmap(isolines);
 
 	if (params.generateWells)
 	{
 		WellParams wellParams = getUIWellParams();
 		for (int i = 0; i < params.numOfWells; ++i)
 		{
-			DrawOperations::drawRandomWell(pixmap, wellParams);
+			DrawOperations::drawRandomWell(pixIso, wellParams);
 		}
 	}
 
-	QPixmap mask = utils::cvMat2Pixmap(grad);
+	QPixmap pixMask = utils::cvMat2Pixmap(mask);
 
-	GenImg result{ pixmap, mask };
+	GenImg result{ pixIso, pixMask };
 	return result;
 
 }
