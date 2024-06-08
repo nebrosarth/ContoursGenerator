@@ -144,6 +144,21 @@ GenImg ContoursGenerator::generateImage()
 	// Fill areas
 	ContoursOperations::fillContours(contours_mat, contours, drawing);
 
+	// Inpaint contours on drawing
+
+	cv::Mat maskInpaint = cv::Mat::zeros(thinned.size(), CV_8UC1);
+	for (size_t i = 0; i < contours.size(); i++)
+	{
+		const Contour& c = contours[i];
+		for (size_t j = 0; j < c.points.size(); ++j)
+		{
+			maskInpaint.at<uchar>(c.points[j]) = 255;
+		}
+	}
+
+	// Inpaint
+	cv::inpaint(drawing, maskInpaint, drawing, 3, cv::INPAINT_TELEA);
+
 	QPixmap pixIso = utils::cvMat2Pixmap(drawing);
 
 	if (params.generateWells)
