@@ -20,6 +20,7 @@ struct GenImg
 namespace utils
 {
     QPixmap cvMat2Pixmap(const cv::Mat& input);
+    cv::Mat QPixmap2cvMat(const QPixmap& in, bool grayscale);
 }
 
 class ContoursGenerator : public QMainWindow

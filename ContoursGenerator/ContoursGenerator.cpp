@@ -161,6 +161,13 @@ GenImg ContoursGenerator::generateImage()
 
 	QPixmap pixIso = utils::cvMat2Pixmap(drawing);
 
+	QFont font;
+	// Draw contours
+	for (const auto& contour : contours)
+	{
+		DrawOperations::drawContourValues(pixIso, contour, QColor(Qt::black), font);
+	}
+
 	if (params.generateWells)
 	{
 		WellParams wellParams = getUIWellParams();
@@ -246,6 +253,21 @@ QPixmap utils::cvMat2Pixmap(const cv::Mat& input)
 	}
 	QPixmap cpy = QPixmap::fromImage(image);
 	return cpy;
+}
+
+cv::Mat utils::QPixmap2cvMat(const QPixmap& in, bool grayscale)
+{
+	QImage im = in.toImage();
+	if (grayscale)
+	{
+		im.convertTo(QImage::Format_Grayscale8);
+		return cv::Mat(im.height(), im.width(), CV_8UC1, const_cast<uchar*>(im.bits()), im.bytesPerLine()).clone();
+	}
+	else
+	{
+		im.convertTo(QImage::Format_BGR888);
+		return cv::Mat(im.height(), im.width(), CV_8UC3, const_cast<uchar*>(im.bits()), im.bytesPerLine()).clone();
+	}
 }
 
 template<int size>
