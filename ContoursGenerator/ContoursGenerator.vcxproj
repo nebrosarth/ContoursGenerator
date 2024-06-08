@@ -67,7 +67,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world490d.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world4100d.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OPENCV_DIR)\lib</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>

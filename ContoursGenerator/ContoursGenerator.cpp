@@ -7,6 +7,8 @@
 #include <qfiledialog.h>
 #include <qtemporaryfile.h>
 #include <quuid.h>
+#include <opencv2/ximgproc.hpp>
+#include <stack>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -143,7 +145,78 @@ GenImg ContoursGenerator::generateImage()
 
 	cv::Mat mask = cv::Scalar(255) - isolines;
 
-	QPixmap pixIso = utils::cvMat2Pixmap(isolines);
+	// apply thinning
+	cv::Mat thinned;
+	cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
+
+	// crop by 1 pixel
+
+	cv::Rect cropRect(1, 1, thinned.cols - 2, thinned.rows - 2);
+	thinned = thinned(cropRect);
+
+	std::vector<Contour> contours;
+
+	findContours(thinned, contours);
+
+	for (size_t i = 0; i < contours.size(); ++i)
+	{
+		Contour& c = contours[i];
+		c.index = i;
+		c.value = i + 1;
+
+		bool isClosed = true;
+
+		if (cv::norm(contours[i].points.front() - contours[i].points.back()) > 3)
+		{
+			isClosed = false;
+		}
+
+		c.isClosed = isClosed;
+
+		c.boundingRect = cv::boundingRect(contours[i].points);
+	}
+
+	cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+	for (size_t i = 0; i < contours.size(); i++)
+	{
+		const Contour& c = contours[i];
+		cv::Scalar color = cv::Scalar(255, 255, 255);
+		for (size_t j = 0; j < c.points.size(); ++j)
+		{
+			contours_mat.at<uchar>(c.points[j]) = c.value;
+		}
+	}
+
+	// Depth mat
+	cv::Mat depthMat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+
+	findDepth(contours_mat, contours);
+
+	for (size_t i = 0; i < contours.size(); i++)
+	{
+		const Contour& c = contours[i];
+		for (size_t j = 0; j < c.points.size(); ++j)
+		{
+			depthMat.at<uchar>(c.points[j]) = c.depth + 1;
+		}
+	}
+
+	// Draw contours
+	cv::Mat drawing = cv::Mat::zeros(thinned.size(), CV_8UC3);
+	for (size_t i = 0; i < contours.size(); i++)
+	{
+		cv::Scalar color = cv::Scalar(255, 255, 255);
+		for (size_t j = 0; j < contours[i].points.size(); ++j)
+		{
+			cv::Scalar color = contours[i].isClosed ? cv::Scalar(75, 75, 75) : cv::Scalar(150, 100, 150);
+			drawing.at<cv::Vec3b>(contours[i].points[j]) = cv::Vec3b(color[0], color[1], color[2]);
+		}
+	}
+
+	// Fill areas
+	fillContours(contours_mat, contours, drawing);
+
+	QPixmap pixIso = utils::cvMat2Pixmap(drawing);
 
 	if (params.generateWells)
 	{
@@ -161,6 +234,311 @@ GenImg ContoursGenerator::generateImage()
 
 }
 
+void ContoursGenerator::findContours(const cv::Mat& img, std::vector<Contour>& contours)
+{
+	int width = img.cols;
+	int height = img.rows;
+
+	cv::Mat mat = img.clone();
+	for (int m = 0; m < height; ++m)
+	{
+		for (int n = 0; n < width; ++n)
+		{
+			if (mat.at<uchar>(m, n) == 255)
+			{
+				Contour c;
+				extractContour(n, m, mat, c.points);
+				contours.push_back(std::move(c));
+			}
+		}
+	}
+}
+
+void ContoursGenerator::extractContour(int x_start, int y_start, cv::Mat& img, std::vector<cv::Point>& contour)
+{
+	int width = img.cols;
+	int height = img.rows;
+
+	int x = x_start;
+	int y = y_start;
+
+	auto isContour = [&](int x, int y) -> bool
+		{
+			if (x < 0 || x >= width || y < 0 || y >= height)
+			{
+				return false;
+			}
+			return img.at<uchar>(y, x) == 255;
+		};
+
+	std::stack<cv::Point> stack;
+
+	stack.push(cv::Point(x, y));
+
+	Direction direction = Direction::NONE;
+
+	cv::Point prev_point = cv::Point(x, y);
+
+	bool reverse = false;
+
+	while (!stack.empty())
+	{
+		cv::Point p = stack.top();
+		stack.pop();
+
+		if (img.at<uchar>(p.y, p.x) == 255)
+		{
+			contour.push_back(p);
+			img.at<uchar>(p.y, p.x) = 0;
+		}
+
+		direction = getDirection(prev_point, p);
+
+		std::vector<cv::Point> neighbours = getOrder(p, direction);
+
+		for (const auto& n : neighbours)
+		{
+			if (isContour(n.x, n.y))
+			{
+				stack.push(n);
+				break;
+			}
+		}
+
+		prev_point = p;
+
+		if (stack.empty())
+		{
+			if (!reverse)
+			{
+				reverse = true;
+
+				cv::Point point(x, y);
+
+				stack.push(point);
+				std::reverse(contour.begin(), contour.end());
+				prev_point = point;
+			}
+		}
+	}
+}
+
+Direction ContoursGenerator::getDirection(cv::Point prev, cv::Point next)
+{
+	Direction direction = Direction::NONE;
+	cv::Point dir = next - prev;
+	if (dir.x != 0 && dir.y != 0)
+	{
+		if (dir.x > 0 && dir.y > 0)
+		{
+			direction = Direction::BOTTOM_RIGHT;
+		}
+		else if (dir.x > 0 && dir.y < 0)
+		{
+			direction = Direction::TOP_RIGHT;
+		}
+		else if (dir.x < 0 && dir.y > 0)
+		{
+			direction = Direction::BOTTOM_LEFT;
+		}
+		else if (dir.x < 0 && dir.y < 0)
+		{
+			direction = Direction::TOP_LEFT;
+		}
+	}
+	else if (dir.x != 0)
+	{
+		if (dir.x > 0)
+		{
+			direction = Direction::RIGHT;
+		}
+		else
+		{
+			direction = Direction::LEFT;
+		}
+	}
+	else if (dir.y != 0)
+	{
+		if (dir.y > 0)
+		{
+			direction = Direction::DOWN;
+		}
+		else
+		{
+			direction = Direction::TOP;
+		}
+	}
+	return direction;
+}
+
+std::vector<cv::Point> ContoursGenerator::getOrder(cv::Point pt, Direction direction)
+{
+	switch (direction)
+	{
+	case Direction::TOP:
+		return { cv::Point(pt.x, pt.y - 1), cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x + 1, pt.y), cv::Point(pt.x - 1, pt.y), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x - 1, pt.y + 1) };
+	case Direction::TOP_RIGHT:
+		return { cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x, pt.y - 1), cv::Point(pt.x + 1, pt.y), cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x, pt.y + 1), cv::Point(pt.x - 1, pt.y) };
+	case Direction::RIGHT:
+		return { cv::Point(pt.x + 1, pt.y), cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x, pt.y - 1), cv::Point(pt.x, pt.y + 1), cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x - 1, pt.y + 1) };
+	case Direction::BOTTOM_RIGHT:
+		return { cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x + 1, pt.y), cv::Point(pt.x, pt.y + 1), cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x - 1, pt.y + 1), cv::Point(pt.x - 1, pt.y), cv::Point(pt.x, pt.y - 1) };
+	case Direction::DOWN:
+		return { cv::Point(pt.x, pt.y + 1), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x - 1, pt.y + 1), cv::Point(pt.x + 1, pt.y), cv::Point(pt.x - 1, pt.y), cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x - 1, pt.y - 1) };
+	case Direction::BOTTOM_LEFT:
+		return { cv::Point(pt.x - 1, pt.y + 1), cv::Point(pt.x, pt.y + 1), cv::Point(pt.x - 1, pt.y), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x, pt.y - 1), cv::Point(pt.x + 1, pt.y) };
+	case Direction::LEFT:
+		return { cv::Point(pt.x - 1, pt.y), cv::Point(pt.x - 1, pt.y + 1), cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x, pt.y + 1), cv::Point(pt.x, pt.y - 1), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x + 1, pt.y - 1) };
+	case Direction::TOP_LEFT:
+		return { cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x, pt.y - 1), cv::Point(pt.x - 1, pt.y), cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x - 1, pt.y + 1), cv::Point(pt.x, pt.y + 1), cv::Point(pt.x + 1, pt.y) };
+	default:
+		return { cv::Point(pt.x, pt.y - 1), cv::Point(pt.x + 1, pt.y - 1), cv::Point(pt.x - 1, pt.y - 1), cv::Point(pt.x + 1, pt.y), cv::Point(pt.x - 1, pt.y), cv::Point(pt.x + 1, pt.y + 1), cv::Point(pt.x - 1, pt.y + 1), cv::Point(pt.x, pt.y + 1) };
+	}
+}
+
+void ContoursGenerator::findDepth(cv::Mat& img, std::vector<Contour>& contours)
+{
+	int width = img.cols;
+	int height = img.rows;
+
+	for (int k = 0; k < contours.size(); ++k)
+	{
+		Contour& c = contours[k];
+		std::set<int> outers_left;
+		std::set<int> outers_right;
+
+		int y = c.points[0].y;
+		uchar prev = 0;
+		for (int x = 0; x < width; ++x)
+		{
+			uchar val = img.at<uchar>(y, x);
+
+			if (val == prev)
+			{
+				continue;
+			}
+
+			if (val != 0 && val != c.value)
+			{
+				if (x < c.points[0].x)
+				{
+					if (outers_left.find(val) == outers_left.end())
+					{
+						outers_left.insert(val);
+					}
+					else
+					{
+						outers_left.erase(val);
+					}
+				}
+				else
+				{
+					if (outers_right.find(val) == outers_right.end())
+					{
+						outers_right.insert(val);
+					}
+					else
+					{
+						outers_right.erase(val);
+					}
+				}
+				prev = val;
+			}
+
+			std::set<int> outers;
+			std::set_union(outers_left.begin(), outers_left.end(), outers_right.begin(), outers_right.end(), std::inserter(outers, outers.begin()));
+
+			for (auto iter = outers.begin(); iter != outers.end();)
+			{
+				int id = *iter;
+				Contour& outer = contours[id - 1];
+				if ((outer.boundingRect & c.boundingRect) != c.boundingRect)
+				{
+					iter = outers.erase(iter);
+				}
+				else
+				{
+					++iter;
+				}
+			}
+
+			c.depth = outers.size();
+		}
+	}
+}
+
+void ContoursGenerator::fillContours(cv::Mat& contoursMat, const std::vector<Contour>& contours, cv::Mat& drawing)
+{
+	int max_depth = 0;
+
+	for (auto& c : contours)
+	{
+		if (c.depth > max_depth)
+		{
+			max_depth = c.depth;
+		}
+	}
+
+	ColorScaler scaler(-1, max_depth, cv::Scalar(18, 185, 27), cv::Scalar(20, 20, 185));
+
+	int width = contoursMat.cols;
+	int height = contoursMat.rows;
+
+	for (int k = 0; k < contours.size(); ++k)
+	{
+		const Contour& c = contours[k];
+		cv::Point seed_point(-1, -1);
+
+		// try point polygon test to find seed point
+		for (auto& pt : c.points)
+		{
+			for (int m = -1; m <= 1; ++m)
+			{
+				for (int n = -1; n <= 1; ++n)
+				{
+					if (m == 0 && n == 0)
+					{
+						continue;
+					}
+					cv::Point p(pt.x + m, pt.y + n);
+					if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height)
+					{
+						continue;
+					}
+					if (contoursMat.at<uchar>(p) == 0)
+					{
+						if (cv::pointPolygonTest(c.points, p, false) > 0)
+						{
+							seed_point = p;
+							goto floodfill;
+						}
+					}
+				}
+			}
+		}
+
+	floodfill:
+		if (seed_point.x != -1)
+		{
+			cv::Scalar color = scaler.getColor(c.depth);
+			cv::floodFill(drawing, seed_point, color);
+		}
+	}
+
+	// fill the holes
+	cv::Scalar hole_color = scaler.getColor(-1);
+	for(int i = 0; i < drawing.rows; ++i)
+	{
+		for(int j = 0; j < drawing.cols; ++j)
+		{
+			if (drawing.at<cv::Vec3b>(i, j) == cv::Vec3b(0, 0, 0))
+			{
+				cv::floodFill(drawing, cv::Point(j, i), hole_color);
+			}
+		}
+	}
+}
+
 void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask)
 {
 	QDir().mkpath(folderPath + "/images");
@@ -169,7 +547,8 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 	QString baseName;
 	int index = 0;
 	QString imageFileName, maskFileName;
-	do {
+	do
+	{
 		baseName = QString::number(index);
 		imageFileName = folderPath + "/images/" + baseName + ".png";
 		maskFileName = folderPath + "/masks/" + baseName + ".png";
@@ -237,4 +616,31 @@ inline void ContoursGenerator::setSize()
 {
 	ui->spinBox_Height->setValue(size);
 	ui->spinBox_Width->setValue(size);
+}
+
+ColorScaler::ColorScaler(double min, double max, const cv::Scalar& minColor, const cv::Scalar& maxColor) :
+	m_min(min)
+	, m_max(max)
+	, m_minColor(minColor)
+	, m_maxColor(maxColor)
+{
+}
+
+cv::Scalar ColorScaler::getColor(double value) const
+{
+	if (value < m_min)
+	{
+		return m_minColor;
+	}
+	if (value > m_max)
+	{
+		return m_maxColor;
+	}
+	double ratio = (value - m_min) / (m_max - m_min);
+	cv::Scalar color;
+	for (int i = 0; i < 3; ++i)
+	{
+		color[i] = m_minColor[i] + ratio * (m_maxColor[i] - m_minColor[i]);
+	}
+	return color;
 }
