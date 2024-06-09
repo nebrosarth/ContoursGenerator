@@ -38,11 +38,14 @@ enum class Direction
 
 struct GenerationParams
 {
-    int width, height;
-    double Xmul, Ymul;
-    int mul;
-    bool generateWells;
-    int numOfWells;
+    int width, height; // image size
+    double Xmul, Ymul; // multipliers for X and Y for Perlin noise
+    int mul; // general multiplier for Perlin noise
+    bool generateWells; // generate wells
+    int numOfWells; // number of wells
+    bool generateIsolines; // generate isolines
+    bool fillContours; // fill contours with color
+    bool drawValues; // draw values on isolines
 };
 
 namespace ContoursOperations

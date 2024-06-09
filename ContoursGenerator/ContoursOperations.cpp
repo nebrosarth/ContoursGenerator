@@ -7,7 +7,6 @@ cv::Mat ContoursOperations::generateIsolines(const GenerationParams& params)
 {
 	const siv::PerlinNoise::seed_type seed = RandomGenerator::instance().getRandomInt(INT_MAX);
 	const siv::PerlinNoise perlin{ seed };
-	//ui->label_Seed->setText(QString::number(seed));
 
 	cv::Mat grad;
 	cv::Mat n(params.width, params.height, CV_64FC1);

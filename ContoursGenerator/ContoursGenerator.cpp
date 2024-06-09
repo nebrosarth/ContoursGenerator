@@ -4,6 +4,7 @@
 #include <qfiledialog.h>
 #include <opencv2/ximgproc.hpp>
 #include "ContoursOperations.h"
+#include <qpainter.h>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -87,85 +88,108 @@ GenImg ContoursGenerator::generateImage()
 {
 	GenerationParams params = getUIParams();
 
-	cv::Mat isolines = ContoursOperations::generateIsolines(params);
+	cv::Mat isolines; // isolines mat
+	cv::Mat mask; // mask mat
+	QPixmap pixIso; // visual representation pixmap
 
-	cv::Mat mask = cv::Scalar(255) - isolines;
-
-	// apply thinning
-	cv::Mat thinned;
-	cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
-
-	// crop by 1 pixel
-	cv::Rect cropRect(1, 1, thinned.cols - 2, thinned.rows - 2);
-	thinned = thinned(cropRect);
-
-	std::vector<Contour> contours;
-
-	// Find contours
-	ContoursOperations::findContours(thinned, contours);
-
-	cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
-	for (size_t i = 0; i < contours.size(); i++)
+	if (params.generateIsolines)
 	{
-		const Contour& c = contours[i];
-		cv::Scalar color = cv::Scalar(255, 255, 255);
-		for (size_t j = 0; j < c.points.size(); ++j)
+		isolines = ContoursOperations::generateIsolines(params);
+
+		mask = cv::Scalar(255) - isolines;
+
+		// apply thinning
+		cv::Mat thinned;
+		cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
+
+		// crop by 1 pixel
+		cv::Rect cropRect(1, 1, thinned.cols - 2, thinned.rows - 2);
+		thinned = thinned(cropRect);
+
+		std::vector<Contour> contours;
+
+		// Find contours
+		ContoursOperations::findContours(thinned, contours);
+
+		cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++)
 		{
-			contours_mat.at<uchar>(c.points[j]) = c.value;
+			const Contour& c = contours[i];
+			cv::Scalar color = cv::Scalar(255, 255, 255);
+			for (size_t j = 0; j < c.points.size(); ++j)
+			{
+				contours_mat.at<uchar>(c.points[j]) = c.value;
+			}
+		}
+
+		// Find depth
+		ContoursOperations::findDepth(contours_mat, contours);
+
+		// Depth mat
+		cv::Mat depthMat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			const Contour& c = contours[i];
+			for (size_t j = 0; j < c.points.size(); ++j)
+			{
+				depthMat.at<uchar>(c.points[j]) = c.depth + 1;
+			}
+		}
+
+		// Draw contours
+		cv::Mat drawing = params.fillContours ? cv::Mat::zeros(thinned.size(), CV_8UC3) : cv::Mat(thinned.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			for (size_t j = 0; j < contours[i].points.size(); ++j)
+			{
+				cv::Scalar color = contours[i].isClosed ? cv::Scalar(75, 75, 75) : cv::Scalar(150, 100, 150);
+				drawing.at<cv::Vec3b>(contours[i].points[j]) = cv::Vec3b(color[0], color[1], color[2]);
+			}
+		}
+
+		if (params.fillContours)
+		{
+			// Fill areas
+			ContoursOperations::fillContours(contours_mat, contours, drawing);
+		}
+
+		// Inpaint contours on drawing
+		cv::Mat maskInpaint = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			const Contour& c = contours[i];
+			for (size_t j = 0; j < c.points.size(); ++j)
+			{
+				maskInpaint.at<uchar>(c.points[j]) = 255;
+			}
+		}
+
+		// Inpaint
+		cv::inpaint(drawing, maskInpaint, drawing, 3, cv::INPAINT_TELEA);
+
+		pixIso = utils::cvMat2Pixmap(drawing);
+
+		// Draw contours
+		QFont font;
+		QPainter painter(&pixIso);
+
+		for (const auto& contour : contours)
+		{
+			if (params.drawValues)
+			{
+				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font);
+			}
+			else
+			{
+				DrawOperations::drawContour(painter, contour, QColor(Qt::black));
+			}
 		}
 	}
-
-	// Find depth
-	ContoursOperations::findDepth(contours_mat, contours);
-
-	// Depth mat
-	cv::Mat depthMat = cv::Mat::zeros(thinned.size(), CV_8UC1);
-	for (size_t i = 0; i < contours.size(); i++)
+	else
 	{
-		const Contour& c = contours[i];
-		for (size_t j = 0; j < c.points.size(); ++j)
-		{
-			depthMat.at<uchar>(c.points[j]) = c.depth + 1;
-		}
-	}
-
-	// Draw contours
-	cv::Mat drawing = cv::Mat::zeros(thinned.size(), CV_8UC3);
-	for (size_t i = 0; i < contours.size(); i++)
-	{
-		cv::Scalar color = cv::Scalar(255, 255, 255);
-		for (size_t j = 0; j < contours[i].points.size(); ++j)
-		{
-			cv::Scalar color = contours[i].isClosed ? cv::Scalar(75, 75, 75) : cv::Scalar(150, 100, 150);
-			drawing.at<cv::Vec3b>(contours[i].points[j]) = cv::Vec3b(color[0], color[1], color[2]);
-		}
-	}
-
-	// Fill areas
-	ContoursOperations::fillContours(contours_mat, contours, drawing);
-
-	// Inpaint contours on drawing
-
-	cv::Mat maskInpaint = cv::Mat::zeros(thinned.size(), CV_8UC1);
-	for (size_t i = 0; i < contours.size(); i++)
-	{
-		const Contour& c = contours[i];
-		for (size_t j = 0; j < c.points.size(); ++j)
-		{
-			maskInpaint.at<uchar>(c.points[j]) = 255;
-		}
-	}
-
-	// Inpaint
-	cv::inpaint(drawing, maskInpaint, drawing, 3, cv::INPAINT_TELEA);
-
-	QPixmap pixIso = utils::cvMat2Pixmap(drawing);
-
-	QFont font;
-	// Draw contours
-	for (const auto& contour : contours)
-	{
-		DrawOperations::drawContourValues(pixIso, contour, QColor(Qt::black), font);
+		isolines = cv::Mat::zeros(params.height, params.width, CV_8UC1);
+		mask = isolines.clone();
+		pixIso = utils::cvMat2Pixmap(isolines);
 	}
 
 	if (params.generateWells)
@@ -222,6 +246,9 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.mul = ui->spinBox_mul->value();
 		params.generateWells = ui->groupBox_Wells->isChecked();
 		params.numOfWells = ui->spinBox_Wells->value();
+		params.generateIsolines = ui->groupBox_Contours->isChecked();
+		params.fillContours = ui->checkBox_Fill->isChecked();
+		params.drawValues = ui->checkBox_DrawValues->isChecked();
 	}
 	return params;
 }

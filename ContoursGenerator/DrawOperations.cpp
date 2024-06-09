@@ -54,9 +54,8 @@ void DrawOperations::drawWellTitle(QPainter& painter, const QPoint& wellPt, cons
 	painter.drawText(textPt, idWellStr);
 }
 
-void DrawOperations::drawContourValues(QPixmap& image, const Contour& contour, QColor textColor, const QFont& font)
+void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, QColor textColor, const QFont& font)
 {
-	QPainter painter(&image);
 	painter.setPen(textColor);
 	painter.setFont(font);
 
@@ -65,6 +64,8 @@ void DrawOperations::drawContourValues(QPixmap& image, const Contour& contour, Q
 	// Draw text along the contour points
 	// Calc the text rotation angle according to the slope of the line
 	// Add rotated bounding rect of text to the clip path
+
+	auto re = painter.clipBoundingRect();
 
 	double minDist = 50;
 	cv::Point prevPt;
@@ -132,12 +133,20 @@ void DrawOperations::drawContourValues(QPixmap& image, const Contour& contour, Q
 	}
 
 	QPainterPath clipInv;
-	clipInv.addRect(image.rect());
+	clipInv.addRect({0,0,INT_MAX,INT_MAX});
 	clipInv -= clipPath;
 
 	painter.setClipPath(clipInv);
+
+	drawContour(painter, contour, Qt::black);
+}
+
+void DrawOperations::drawContour(QPainter& painter, const Contour& contour, QColor color)
+{
 	// Draw contour polyline
+	painter.setPen(color);
 	std::vector<QPoint> pts;
+	pts.reserve(contour.points.size());
 	for (auto& pt : contour.points)
 	{
 		pts.emplace_back(pt.x, pt.y);
