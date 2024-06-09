@@ -46,6 +46,7 @@ struct GenerationParams
     bool generateIsolines; // generate isolines
     bool fillContours; // fill contours with color
     bool drawValues; // draw values on isolines
+    int textDistance; // minimal distance between texts on isolines
 };
 
 namespace ContoursOperations

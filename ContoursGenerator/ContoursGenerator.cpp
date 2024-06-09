@@ -177,7 +177,7 @@ GenImg ContoursGenerator::generateImage()
 		{
 			if (params.drawValues)
 			{
-				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font);
+				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance);
 			}
 			else
 			{
@@ -248,7 +248,8 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.numOfWells = ui->spinBox_Wells->value();
 		params.generateIsolines = ui->groupBox_Contours->isChecked();
 		params.fillContours = ui->checkBox_Fill->isChecked();
-		params.drawValues = ui->checkBox_DrawValues->isChecked();
+		params.drawValues = ui->groupBox_DrawValues->isChecked();
+		params.textDistance = ui->spinBox_TextDistance->value();
 	}
 	return params;
 }

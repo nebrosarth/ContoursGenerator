@@ -54,7 +54,7 @@ void DrawOperations::drawWellTitle(QPainter& painter, const QPoint& wellPt, cons
 	painter.drawText(textPt, idWellStr);
 }
 
-void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, QColor textColor, const QFont& font)
+void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour, QColor textColor, const QFont& font, int minTextDistance)
 {
 	painter.setPen(textColor);
 	painter.setFont(font);
@@ -65,9 +65,7 @@ void DrawOperations::drawContourValues(QPainter& painter, const Contour& contour
 	// Calc the text rotation angle according to the slope of the line
 	// Add rotated bounding rect of text to the clip path
 
-	auto re = painter.clipBoundingRect();
-
-	double minDist = 50;
+	double minDist = minTextDistance;
 	cv::Point prevPt;
 	for (size_t i = 0; i < contour.points.size(); i++)
 	{
