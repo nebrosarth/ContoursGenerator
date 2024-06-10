@@ -9,15 +9,7 @@ namespace Ui { class ContoursGeneratorClass; };
 QT_END_NAMESPACE
 
 struct WellParams;
-
-struct GenerationParams
-{
-    int width, height;
-    double Xmul, Ymul;
-    int mul;
-    bool generateWells;
-    int numOfWells;
-};
+struct GenerationParams;
 
 struct GenImg
 {
@@ -28,6 +20,7 @@ struct GenImg
 namespace utils
 {
     QPixmap cvMat2Pixmap(const cv::Mat& input);
+    cv::Mat QPixmap2cvMat(const QPixmap& in, bool grayscale);
 }
 
 class ContoursGenerator : public QMainWindow
@@ -47,6 +40,8 @@ protected slots:
 protected:
     void initConnections();
     GenImg generateImage();
+
+    void saveImageSplit(const QString& folderPath, const GenImg& gen);
     void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
     GenerationParams getUIParams();
     WellParams getUIWellParams();

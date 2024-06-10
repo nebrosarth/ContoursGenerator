@@ -64,15 +64,22 @@
     <IncludePath>$(OPENCV_IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <IncludePath>$(OPENCV_IncludePath);$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world490d.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world4100d.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OPENCV_DIR)\lib</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Link>
+      <AdditionalLibraryDirectories>$(OPENCV_DIR)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies);$(Qt_LIBS_);opencv_world4100.lib</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
@@ -99,6 +106,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ContoursOperations.cpp" />
     <ClCompile Include="RandomGenerator.cpp" />
     <QtRcc Include="ContoursGenerator.qrc" />
     <QtUic Include="ContoursGenerator.ui" />
@@ -108,6 +116,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ContoursOperations.h" />
     <ClInclude Include="DrawOperations.h" />
     <ClInclude Include="PerlinNoise.hpp" />
     <ClInclude Include="RandomGenerator.h" />

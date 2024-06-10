@@ -1,12 +1,11 @@
 #include "ContoursGenerator.h"
-#include "PerlinNoise.hpp"
-#include <omp.h>
 #include "DrawOperations.h"
-#include "RandomGenerator.h"
 #include <qfile.h>
 #include <qfiledialog.h>
-#include <qtemporaryfile.h>
-#include <quuid.h>
+#include <opencv2/ximgproc.hpp>
+#include "ContoursOperations.h"
+#include <qpainter.h>
+#include <QProgressDialog>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -67,12 +66,23 @@ void ContoursGenerator::OnSaveBatch()
 		return;
 	}
 
+	// show progress dialog
+	QProgressDialog progress("Generating images...", "Abort", 0, ui->spinBox_BatchSize->value(), this);
+	progress.setWindowModality(Qt::WindowModal);
+	progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
 	int batchSize = ui->spinBox_BatchSize->value();
 	for (int i = 0; i < batchSize; ++i)
 	{
+		if(progress.wasCanceled())
+		{
+			break;
+		}
 		GenImg generation = generateImage();
-		saveImage(folderName, generation.image, generation.mask);
+		saveImageSplit(folderName, generation);
+		progress.setValue(i);
 	}
+	progress.setValue(batchSize);
 }
 
 void ContoursGenerator::initConnections()
@@ -91,66 +101,155 @@ GenImg ContoursGenerator::generateImage()
 {
 	GenerationParams params = getUIParams();
 
-	const siv::PerlinNoise::seed_type seed = RandomGenerator::instance().getRandomInt(INT_MAX);
-	const siv::PerlinNoise perlin{ seed };
-	ui->label_Seed->setText(QString::number(seed));
+	cv::Mat isolines; // isolines mat
+	cv::Mat mask; // mask mat
+	QPixmap pixIso; // visual representation pixmap
 
-	cv::Mat grad;
-	cv::Mat n(params.width, params.height, CV_64FC1);
+	int cropSize = 1;
 
-	double xMul = params.Xmul; // default: 0.005
-	double yMul = params.Ymul; // default: 0.005
-	int mul = params.mul; // default: 20
-
-#pragma omp parallel for
-	for (int j = 0; j < n.rows; ++j)
+	if (params.generateIsolines)
 	{
-		for (int i = 0; i < n.cols; ++i)
+		isolines = ContoursOperations::generateIsolines(params);
+
+		mask = cv::Scalar(255) - isolines;
+
+		// apply thinning
+		cv::Mat thinned;
+		cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
+
+		// crop by 1 pixel
+		cv::Rect cropRect(cropSize, cropSize, thinned.cols - 2 * cropSize, thinned.rows - 2 * cropSize);
+		thinned = thinned(cropRect);
+
+		std::vector<Contour> contours;
+
+		// Find contours
+		ContoursOperations::findContours(thinned, contours);
+
+		cv::Mat contours_mat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++)
 		{
-			double noise = perlin.noise2D_01(i * xMul, j * yMul) * mul;
-			int nnn = (int)ceil(noise);
-			noise = noise - floor(noise);
-			n.at<double>(j, i) = noise;
+			const Contour& c = contours[i];
+			cv::Scalar color = cv::Scalar(255, 255, 255);
+			for (size_t j = 0; j < c.points.size(); ++j)
+			{
+				contours_mat.at<uchar>(c.points[j]) = c.value;
+			}
+		}
+
+		// Find depth
+		ContoursOperations::findDepth(contours_mat, contours);
+
+		// Depth mat
+		cv::Mat depthMat = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			const Contour& c = contours[i];
+			for (size_t j = 0; j < c.points.size(); ++j)
+			{
+				depthMat.at<uchar>(c.points[j]) = c.depth + 1;
+			}
+		}
+
+		// Draw contours
+		cv::Mat drawing = params.fillContours ? cv::Mat::zeros(thinned.size(), CV_8UC3) : cv::Mat(thinned.size(), CV_8UC3, cv::Scalar(255, 255, 255));
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			for (size_t j = 0; j < contours[i].points.size(); ++j)
+			{
+				cv::Scalar color = contours[i].isClosed ? cv::Scalar(75, 75, 75) : cv::Scalar(150, 100, 150);
+				drawing.at<cv::Vec3b>(contours[i].points[j]) = cv::Vec3b(color[0], color[1], color[2]);
+			}
+		}
+
+		if (params.fillContours)
+		{
+			// Fill areas
+			ContoursOperations::fillContours(contours_mat, contours, drawing);
+		}
+
+		// Inpaint contours on drawing
+		cv::Mat maskInpaint = cv::Mat::zeros(thinned.size(), CV_8UC1);
+		for (size_t i = 0; i < contours.size(); i++)
+		{
+			const Contour& c = contours[i];
+			for (size_t j = 0; j < c.points.size(); ++j)
+			{
+				maskInpaint.at<uchar>(c.points[j]) = 255;
+			}
+		}
+
+		// Inpaint
+		cv::inpaint(drawing, maskInpaint, drawing, 3, cv::INPAINT_TELEA);
+
+		pixIso = utils::cvMat2Pixmap(drawing);
+
+		// Draw contours 
+		QFont font;
+		QPainter painter(&pixIso);
+
+		for (const auto& contour : contours)
+		{
+			if (params.drawValues)
+			{
+				DrawOperations::drawContourValues(painter, contour, QColor(Qt::black), font, params.textDistance);
+			}
+			else
+			{
+				DrawOperations::drawContour(painter, contour, QColor(Qt::black));
+			}
 		}
 	}
-
-	cv::Mat grad_x, grad_y;
-	cv::Mat abs_grad_x, abs_grad_y;
-	cv::Sobel(n, grad_x, CV_64FC1, 1, 0);
-	cv::Sobel(n, grad_y, CV_64FC1, 0, 1);
-	cv::convertScaleAbs(grad_x, abs_grad_x);
-	cv::convertScaleAbs(grad_y, abs_grad_y);
-	cv::addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad);
-
-	cv::Mat normalized;
-	n.convertTo(normalized, CV_8UC1, 255, 0);
-	grad.forEach<uchar>([](uchar& u, const int* pos)
-		{
-			if (u == 1)
-				u = 0;
-			else if (u > 1)
-			{
-				u = 255;
-			}
-		});
-	cv::Mat gradInv = cv::Scalar(255) - grad;
-
-	QPixmap pixmap = utils::cvMat2Pixmap(gradInv);
+	else
+	{
+		isolines = cv::Mat::zeros(params.height, params.width, CV_8UC1);
+		mask = isolines.clone();
+		pixIso = utils::cvMat2Pixmap(isolines);
+	}
 
 	if (params.generateWells)
 	{
 		WellParams wellParams = getUIWellParams();
 		for (int i = 0; i < params.numOfWells; ++i)
 		{
-			DrawOperations::drawRandomWell(pixmap, wellParams);
+			DrawOperations::drawRandomWell(pixIso, wellParams);
 		}
 	}
 
-	QPixmap mask = utils::cvMat2Pixmap(grad);
+	QPixmap pixMask = utils::cvMat2Pixmap(mask);
 
-	GenImg result{ pixmap, mask };
+	// inpaint cropped pixels
+	cv::Mat pixIsoUncropped = utils::QPixmap2cvMat(pixIso, false);
+	cv::Mat maskUncropped = cv::Mat::zeros(pixIsoUncropped.size(), CV_8UC1);
+	// enlarge by 1 pixel
+	cv::copyMakeBorder(pixIsoUncropped, pixIsoUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
+	cv::copyMakeBorder(maskUncropped, maskUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255));
+	cv::inpaint(pixIsoUncropped, maskUncropped, pixIsoUncropped, 3, cv::INPAINT_TELEA);
+	
+	QPixmap pixIsoResult = utils::cvMat2Pixmap(pixIsoUncropped);
+
+	GenImg result{ pixIsoResult, pixMask };
 	return result;
+}
 
+void ContoursGenerator::saveImageSplit(const QString& folderPath, const GenImg& gen)
+{
+	int baseSize = 256;
+	int width = gen.image.width();
+	int height = gen.image.height();
+	int numX = width / baseSize;
+	int numY = height / baseSize;
+
+	for (int i = 0; i < numX; ++i)
+	{
+		for (int j = 0; j < numY; ++j)
+		{
+			QRect rect(i * baseSize, j * baseSize, baseSize, baseSize);
+			QPixmap img = gen.image.copy(rect);
+			QPixmap mask = gen.mask.copy(rect);
+			saveImage(folderPath, img, mask);
+		}
+	}
 }
 
 void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask)
@@ -161,7 +260,8 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 	QString baseName;
 	int index = 0;
 	QString imageFileName, maskFileName;
-	do {
+	do
+	{
 		baseName = QString::number(index);
 		imageFileName = folderPath + "/images/" + baseName + ".jpg";
 		maskFileName = folderPath + "/masks/" + baseName + ".jpg";
@@ -191,6 +291,10 @@ GenerationParams ContoursGenerator::getUIParams()
 		params.mul = ui->spinBox_mul->value();
 		params.generateWells = ui->groupBox_Wells->isChecked();
 		params.numOfWells = ui->spinBox_Wells->value();
+		params.generateIsolines = ui->groupBox_Contours->isChecked();
+		params.fillContours = ui->checkBox_Fill->isChecked();
+		params.drawValues = ui->groupBox_DrawValues->isChecked();
+		params.textDistance = ui->spinBox_TextDistance->value();
 	}
 	return params;
 }
@@ -227,9 +331,51 @@ QPixmap utils::cvMat2Pixmap(const cv::Mat& input)
 	return cpy;
 }
 
+cv::Mat utils::QPixmap2cvMat(const QPixmap& in, bool grayscale)
+{
+	QImage im = in.toImage();
+	if (grayscale)
+	{
+		im.convertTo(QImage::Format_Grayscale8);
+		return cv::Mat(im.height(), im.width(), CV_8UC1, const_cast<uchar*>(im.bits()), im.bytesPerLine()).clone();
+	}
+	else
+	{
+		im.convertTo(QImage::Format_BGR888);
+		return cv::Mat(im.height(), im.width(), CV_8UC3, const_cast<uchar*>(im.bits()), im.bytesPerLine()).clone();
+	}
+}
+
 template<int size>
 inline void ContoursGenerator::setSize()
 {
 	ui->spinBox_Height->setValue(size);
 	ui->spinBox_Width->setValue(size);
+}
+
+ColorScaler::ColorScaler(double min, double max, const cv::Scalar& minColor, const cv::Scalar& maxColor) :
+	m_min(min)
+	, m_max(max)
+	, m_minColor(minColor)
+	, m_maxColor(maxColor)
+{
+}
+
+cv::Scalar ColorScaler::getColor(double value) const
+{
+	if (value < m_min)
+	{
+		return m_minColor;
+	}
+	if (value > m_max)
+	{
+		return m_maxColor;
+	}
+	double ratio = (value - m_min) / (m_max - m_min);
+	cv::Scalar color;
+	for (int i = 0; i < 3; ++i)
+	{
+		color[i] = m_minColor[i] + ratio * (m_maxColor[i] - m_minColor[i]);
+	}
+	return color;
 }
