@@ -5,6 +5,7 @@
 #include <opencv2/ximgproc.hpp>
 #include "ContoursOperations.h"
 #include <qpainter.h>
+#include <QProgressDialog>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
@@ -64,12 +65,23 @@ void ContoursGenerator::OnSaveBatch()
 		return;
 	}
 
+	// show progress dialog
+	QProgressDialog progress("Generating images...", "Abort", 0, ui->spinBox_BatchSize->value(), this);
+	progress.setWindowModality(Qt::WindowModal);
+	progress.setWindowFlags(progress.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+
 	int batchSize = ui->spinBox_BatchSize->value();
 	for (int i = 0; i < batchSize; ++i)
 	{
+		if(progress.wasCanceled())
+		{
+			break;
+		}
 		GenImg generation = generateImage();
-		saveImage(folderName, generation.image, generation.mask);
+		saveImageSplit(folderName, generation);
+		progress.setValue(i);
 	}
+	progress.setValue(batchSize);
 }
 
 void ContoursGenerator::initConnections()
@@ -92,6 +104,8 @@ GenImg ContoursGenerator::generateImage()
 	cv::Mat mask; // mask mat
 	QPixmap pixIso; // visual representation pixmap
 
+	int cropSize = 1;
+
 	if (params.generateIsolines)
 	{
 		isolines = ContoursOperations::generateIsolines(params);
@@ -103,7 +117,7 @@ GenImg ContoursGenerator::generateImage()
 		cv::ximgproc::thinning(mask, thinned, cv::ximgproc::THINNING_GUOHALL);
 
 		// crop by 1 pixel
-		cv::Rect cropRect(1, 1, thinned.cols - 2, thinned.rows - 2);
+		cv::Rect cropRect(cropSize, cropSize, thinned.cols - 2 * cropSize, thinned.rows - 2 * cropSize);
 		thinned = thinned(cropRect);
 
 		std::vector<Contour> contours;
@@ -169,7 +183,7 @@ GenImg ContoursGenerator::generateImage()
 
 		pixIso = utils::cvMat2Pixmap(drawing);
 
-		// Draw contours
+		// Draw contours 
 		QFont font;
 		QPainter painter(&pixIso);
 
@@ -203,8 +217,38 @@ GenImg ContoursGenerator::generateImage()
 
 	QPixmap pixMask = utils::cvMat2Pixmap(mask);
 
-	GenImg result{ pixIso, pixMask };
+	// inpaint cropped pixels
+	cv::Mat pixIsoUncropped = utils::QPixmap2cvMat(pixIso, false);
+	cv::Mat maskUncropped = cv::Mat::zeros(pixIsoUncropped.size(), CV_8UC1);
+	// enlarge by 1 pixel
+	cv::copyMakeBorder(pixIsoUncropped, pixIsoUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
+	cv::copyMakeBorder(maskUncropped, maskUncropped, cropSize, cropSize, cropSize, cropSize, cv::BORDER_CONSTANT, cv::Scalar(255));
+	cv::inpaint(pixIsoUncropped, maskUncropped, pixIsoUncropped, 3, cv::INPAINT_TELEA);
+	
+	QPixmap pixIsoResult = utils::cvMat2Pixmap(pixIsoUncropped);
+
+	GenImg result{ pixIsoResult, pixMask };
 	return result;
+}
+
+void ContoursGenerator::saveImageSplit(const QString& folderPath, const GenImg& gen)
+{
+	int baseSize = 256;
+	int width = gen.image.width();
+	int height = gen.image.height();
+	int numX = width / baseSize;
+	int numY = height / baseSize;
+
+	for (int i = 0; i < numX; ++i)
+	{
+		for (int j = 0; j < numY; ++j)
+		{
+			QRect rect(i * baseSize, j * baseSize, baseSize, baseSize);
+			QPixmap img = gen.image.copy(rect);
+			QPixmap mask = gen.mask.copy(rect);
+			saveImage(folderPath, img, mask);
+		}
+	}
 }
 
 void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask)
@@ -218,16 +262,16 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 	do
 	{
 		baseName = QString::number(index);
-		imageFileName = folderPath + "/images/" + baseName + ".png";
-		maskFileName = folderPath + "/masks/" + baseName + ".png";
+		imageFileName = folderPath + "/images/" + baseName + ".jpg";
+		maskFileName = folderPath + "/masks/" + baseName + ".jpg";
 		index++;
 	} while (QFile::exists(imageFileName) || QFile::exists(maskFileName));
 
-	if (!img.save(imageFileName, "PNG"))
+	if (!img.save(imageFileName, "JPG"))
 	{
 		return;
 	}
-	if (!mask.save(maskFileName, "PNG"))
+	if (!mask.save(maskFileName, "JPG"))
 	{
 		QFile::remove(imageFileName);
 		return;

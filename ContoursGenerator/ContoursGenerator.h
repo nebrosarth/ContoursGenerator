@@ -41,6 +41,7 @@ protected:
     void initConnections();
     GenImg generateImage();
 
+    void saveImageSplit(const QString& folderPath, const GenImg& gen);
     void saveImage(const QString& folderPath, const QPixmap& img, const QPixmap& mask);
     GenerationParams getUIParams();
     WellParams getUIWellParams();
