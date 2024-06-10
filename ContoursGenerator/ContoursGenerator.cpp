@@ -6,6 +6,7 @@
 #include "ContoursOperations.h"
 #include <qpainter.h>
 #include <QProgressDialog>
+#include <RandomGenerator.h>
 
 ContoursGenerator::ContoursGenerator(QWidget* parent)
 	: QMainWindow(parent)
