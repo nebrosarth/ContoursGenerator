@@ -13,6 +13,7 @@ ContoursGenerator::ContoursGenerator(QWidget* parent)
 	, ui(new Ui::ContoursGeneratorClass())
 {
 	ui->setupUi(this);
+	this->setWindowIcon(QIcon("iso.ico"));
 
 	initConnections();
 }
@@ -162,16 +163,16 @@ void ContoursGenerator::saveImage(const QString& folderPath, const QPixmap& img,
 	QString imageFileName, maskFileName;
 	do {
 		baseName = QString::number(index);
-		imageFileName = folderPath + "/images/" + baseName + ".png";
-		maskFileName = folderPath + "/masks/" + baseName + ".png";
+		imageFileName = folderPath + "/images/" + baseName + ".jpg";
+		maskFileName = folderPath + "/masks/" + baseName + ".jpg";
 		index++;
 	} while (QFile::exists(imageFileName) || QFile::exists(maskFileName));
 
-	if (!img.save(imageFileName, "PNG"))
+	if (!img.save(imageFileName, "JPG"))
 	{
 		return;
 	}
-	if (!mask.save(maskFileName, "PNG"))
+	if (!mask.save(maskFileName, "JPG"))
 	{
 		QFile::remove(imageFileName);
 		return;
@@ -205,6 +206,9 @@ WellParams ContoursGenerator::getUIWellParams()
 		params.offset = ui->spinBox_WellnameOffset->value();
 		params.outline = ui->spinBox_WellOutline->value();
 	}
+
+	params.color = RandomGenerator::instance().getRandomColor();
+
 	return params;
 }
 

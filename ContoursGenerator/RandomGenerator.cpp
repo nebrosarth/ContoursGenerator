@@ -11,6 +11,11 @@ QPoint RandomGenerator::getRandomPoint(int maxWidth, int maxHeight)
 	return { getRandomInt(maxWidth), getRandomInt(maxHeight) };
 }
 
+QColor RandomGenerator::getRandomColor()
+{
+	return QColor( getRandomInt(255), getRandomInt(255), getRandomInt(255));
+}
+
 int RandomGenerator::getRandomInt(int max)
 {
 	return distribution(rng) * max;

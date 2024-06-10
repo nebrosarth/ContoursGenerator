@@ -8,6 +8,7 @@ struct WellParams
 	int offset;
 	bool drawText;
 	int outline;
+	QColor color;
 };
 
 

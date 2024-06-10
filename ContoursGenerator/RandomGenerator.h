@@ -2,12 +2,14 @@
 #include <qpoint.h>
 #include <random>
 #include <map>
+#include <qcolor.h>
 
 class RandomGenerator
 {
 public:
 	static RandomGenerator& instance();
 	QPoint getRandomPoint(int maxWidth, int maxHeight);
+	QColor getRandomColor();
 	int getRandomInt(int max);
 
 	RandomGenerator(const RandomGenerator&) = delete;

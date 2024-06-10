@@ -25,7 +25,7 @@ void DrawOperations::drawRandomWell(QPixmap& image, const WellParams& params)
 		painter.setPen(Qt::NoPen);
 	}
 
-	painter.setBrush(Qt::cyan);
+	painter.setBrush(params.color);
 	painter.drawEllipse(wellPt, radius, radius);
 
 	if (params.drawText)
